@@ -8,6 +8,7 @@ using Marten.Linq;
 
 namespace Marten.Services.BatchQuerying;
 
+//TODO replace `DateTime` parameters with `DateTimeOffset` in next major release
 public interface IBatchEvents
 {
     /// <summary>
@@ -52,6 +53,14 @@ public interface IBatchEvents
     /// <returns></returns>
     Task<IReadOnlyList<IEvent>> FetchStream(string streamKey, long version = 0, DateTime? timestamp = null,
         long fromVersion = 0);
+
+    Task<T?> AggregateStream<T>(Guid streamId, long version = 0, DateTime? timestamp = null, T? state = null,
+        long fromVersion = 0) where T : class;
+
+    Task<T?> AggregateStream<T>(string streamKey, long version = 0, DateTime? timestamp = null, T? state = null,
+        long fromVersion = 0) where T : class;
+
+
 }
 
 public interface IBatchedQuery

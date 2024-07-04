@@ -204,6 +204,51 @@ internal class BatchedQuery: IBatchedQuery, IBatchEvents
         return AddItem(handler);
     }
 
+    public async Task<T?> AggregateStream<T>(Guid streamId, long version = 0, DateTime? timestamp = null, T? state = null,
+        long fromVersion = 0) where T : class
+    {
+        var events = await FetchStream(streamId, version, timestamp, fromVersion).ConfigureAwait(false);
+
+        var aggregator = _parent.Options.Projections.AggregatorFor<T>();
+
+        if (!events.Any())
+        {
+            return state;
+        }
+
+        var aggregate = aggregator.Build(events, _parent, state);
+
+        var storage = _parent.StorageFor<T>();
+        if (storage is IDocumentStorage<T, Guid> s)
+        {
+            s.SetIdentity(aggregate, streamId);
+        }
+
+        return aggregate;
+    }
+
+    public async Task<T?> AggregateStream<T>(string streamKey, long version = 0, DateTime? timestamp = null, T? state = null,
+        long fromVersion = 0) where T : class
+    {
+        var events = await FetchStream(streamKey, version, timestamp, fromVersion).ConfigureAwait(false);
+        if (!events.Any())
+        {
+            return state;
+        }
+
+        var aggregator = _parent.Options.Projections.AggregatorFor<T>();
+        var aggregate = aggregator.Build(events, _parent, state);
+
+        var storage = _parent.StorageFor<T>();
+        if (storage is IDocumentStorage<T, string> s)
+        {
+            s.SetIdentity(aggregate, streamKey);
+        }
+
+        return aggregate;
+    }
+
+
     public Task<T> AddItem<T>(IQueryHandler<T> handler)
     {
         var item = new BatchQueryItem<T>(handler);

@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
+using EventSourcingTests.Projections;
 using Marten;
 using Marten.Events;
 using Marten.Events.Projections;
@@ -121,6 +122,37 @@ public class event_store_with_string_identifiers_for_stream: OneOffConfiguration
             var state2 = await session.Events.FetchStreamStateAsync("Second");
             state2.Key.ShouldBe("Second");
             state2.Version.ShouldBe(3);
+        }
+    }
+
+    [Fact]
+    public async Task bulk_querying_multiple_aggregates()
+    {
+        await using (var session = theStore.LightweightSession())
+        {
+            session.Events.Append("First", new QuestStarted() {Name = "First"}, new MembersJoined() { Members = ["AMember"]});
+            session.Events.Append("Second", new QuestStarted() {Name = "Second"}, new MembersJoined() { Members = ["AMember"]});
+            await session.SaveChangesAsync();
+        }
+
+        await using (var session = theStore.LightweightSession())
+        {
+            var batch = session.CreateBatchQuery();
+
+            var state = batch.Events.AggregateStream<QuestParty>("First");
+            var state2 = batch.Events.AggregateStream<QuestParty>("Second");
+
+            await batch.Execute();
+
+            var aggregate = await state;
+
+            aggregate!.Name.ShouldBe("First");
+            aggregate.Members.Count.ShouldBe(1);
+
+            var aggregate2 = await state2;
+
+            aggregate2!.Name.ShouldBe("Second");
+            aggregate2.Members.Count.ShouldBe(1);
         }
     }
 
